@@ -1,0 +1,881 @@
+<html>
+
+<head>
+<title>ICG WebGL &mdash; HW1</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="./js/glMatrix-0.9.5.min.js"></script>
+<script type="text/javascript" src="./js/webgl-utils.js"></script>
+
+
+<!-- 
+    **************************************************Flat shader**************************************************
+-->
+<script id="vertexShader_Flat" type="vertex">
+    // reference: http://www.kickjs.org/example/shader_editor/shader_editor.html#
+
+    attribute vec3 aVertexPosition_Flat;
+    attribute vec3 aVertexNormal_Flat;
+
+    // 固定變數
+    uniform mat4 uMVMatrix_Flat; // model view matrix 看向的方向
+    uniform mat4 uPMatrix_Flat;  // projection matrix 攝影機的位置
+
+    // 可傳到別的地方的變數
+	varying vec3 mvVertex_Flat;
+    varying vec3 mvNormal_Flat;
+
+    void main(void) {
+        
+    	mvVertex_Flat = (uMVMatrix_Flat * vec4(aVertexPosition_Flat, 1.0)).xyz;
+    	mat3 normalMatrix = mat3(uMVMatrix_Flat);
+    	mvNormal_Flat = normalMatrix * aVertexNormal_Flat;
+
+        gl_Position = uPMatrix_Flat * uMVMatrix_Flat * vec4(aVertexPosition_Flat, 1.0);
+    }
+</script>
+
+<script id="fragmentShader_Flat" type="fragment">
+    #ifdef GL_ES
+    precision highp float;
+    #endif
+
+    #extension GL_EXT_shader_texture_lod : enable
+    #extension GL_OES_standard_derivatives : enable
+
+    // 可傳到別的地方的變數
+	varying vec3 mvVertex_Flat;
+    varying vec3 mvNormal_Flat;
+
+    void main(void) {
+        vec3 X = dFdx(mvVertex_Flat);
+        vec3 Y = dFdy(mvVertex_Flat);
+        vec3 normal = normalize(cross(X, Y));
+
+        // 打在 vertex 上的光線設定
+    	vec3 light1 = vec3(-50, 20, -25); // 光線位置
+    	vec3 lightColor1 = vec3(1.0, 0.0, 0.0);  // 光線顏色
+
+        vec3 light2 = vec3(0, 20, -25); // 光線位置
+    	vec3 lightColor2 = vec3(0.0, 1.0, 0.0);  // 光線顏色
+
+        vec3 light3 = vec3(50, 20, -25); // 光線位置
+    	vec3 lightColor3 = vec3(0.0, 0.0, 1.0);  // 光線顏色
+
+        vec3 V = -normalize(mvVertex_Flat);
+    	vec3 N = normalize(mvNormal_Flat);
+
+    	vec3 L1 = normalize(light1 - mvVertex_Flat);
+        float cos1 = max(dot(L1, normal), 0.0);
+
+        vec3 L2 = normalize(light2 - mvVertex_Flat);
+        float cos2 = max(dot(L2, normal), 0.0);
+
+        vec3 L3 = normalize(light3 - mvVertex_Flat);
+        float cos3 = max(dot(L3, normal), 0.0);
+    	
+        gl_FragColor = vec4(lightColor1 * cos1 + lightColor2 * cos2 + lightColor3 * cos3, 1.0);
+    }
+</script>
+
+
+<!-- 
+    **************************************************Gouraud shader**************************************************
+-->
+
+
+<script id="vertexShader_Gouraud" type="vertex">
+    // reference: http://www.cs.toronto.edu/~jacobson/phong-demo/
+
+
+    attribute vec3 aVertexPosition_Gouraud;
+    attribute vec3 aFrontColor_Gouraud;
+    attribute vec3 aVertexNormal_Gouraud;
+
+    // 固定變數
+    uniform mat4 uMVMatrix_Gouraud; // model view matrix 看向的方向
+    uniform mat4 uPMatrix_Gouraud;  // projection matrix 攝影機的位置
+
+    // 可傳到別的地方的變數
+	varying vec4 fragcolor_Gouraud;
+
+    void main(void) {
+        // 打在 vertex 上的光線設定
+    	vec3 light1 = vec3(-50, 20, -25); // 光線位置
+    	vec3 lightColor1 = vec3(1.0, 0.0, 0.0);  // 光線顏色
+
+        vec3 light2 = vec3(0, 20, -25); // 光線位置
+    	vec3 lightColor2 = vec3(0.0, 1.0, 0.0);  // 光線顏色
+
+        vec3 light3 = vec3(50, 20, -25); // 光線位置
+    	vec3 lightColor3 = vec3(0.0, 0.0, 1.0);  // 光線顏色
+
+
+    	vec3 mvVertex = (uMVMatrix_Gouraud * vec4(aVertexPosition_Gouraud, 1.0)).xyz;
+    	mat3 normalMatrix = mat3(uMVMatrix_Gouraud);
+    	vec3 mvNormal = normalMatrix * aVertexNormal_Gouraud;
+
+    	vec3 V = -normalize(mvVertex);
+    	vec3 N = normalize(mvNormal);
+    	vec3 L1 = normalize(light1 - mvVertex);
+        vec3 H1 = normalize(L1+V);
+
+        vec3 L2 = normalize(light2 - mvVertex);
+        vec3 H2 = normalize(L2+V);
+
+        vec3 L3 = normalize(light3 - mvVertex);
+    	vec3 H3 = normalize(L3+V);
+
+    	float ka = 0.2;
+    	float kd = 0.2;
+    	float ks = 0.6;
+
+    	vec3 ambient = lightColor1 * ka * aFrontColor_Gouraud + lightColor2 * ka * aFrontColor_Gouraud + lightColor3 * ka * aFrontColor_Gouraud;
+    	
+        float cos1 = max(dot(L1,N), 0.0);
+        float cos2 = max(dot(L2,N), 0.0);
+        float cos3 = max(dot(L3,N), 0.0);
+
+    	vec3 diffuse = lightColor1 * kd * aFrontColor_Gouraud * cos1 + lightColor2 * kd * aFrontColor_Gouraud * cos2 + lightColor3 * kd * aFrontColor_Gouraud * cos3;
+    	
+        float cosAlpha1 = max(dot(H1,N), 0.0);
+        float cosAlpha2 = max(dot(H2,N), 0.0);
+        float cosAlpha3 = max(dot(H3,N), 0.0);
+
+    	vec3 specular = lightColor1 * ks * pow(cosAlpha1, 16.0) + lightColor2 * ks * pow(cosAlpha2, 16.0) + lightColor3 * ks * pow(cosAlpha3, 16.0);
+
+    	vec3 gouraud = vec3(0.0, 0.0, 0.0);
+
+    	gouraud = ambient + diffuse + specular;
+
+        fragcolor_Gouraud = vec4(gouraud, 1.0);
+        gl_Position = uPMatrix_Gouraud * uMVMatrix_Gouraud * vec4(aVertexPosition_Gouraud, 1.0);
+    }
+</script>
+
+<script id="fragmentShader_Gouraud" type="fragment">
+    precision mediump float;
+
+    varying vec4 fragcolor_Gouraud;
+
+    void main(void) {
+        gl_FragColor = fragcolor_Gouraud;
+    }
+</script>
+
+
+
+<!-- 
+    **************************************************Phong shader**************************************************
+-->
+<script id="vertexShader_Phong" type="vertex">
+    // reference: http://www.cs.toronto.edu/~jacobson/phong-demo/
+
+    attribute vec3 aVertexPosition_Phong;
+    attribute vec3 aVertexNormal_Phong;
+    attribute vec3 aFrontColor_Phong;
+
+    // 固定變數
+    uniform mat4 uMVMatrix_Phong;   // model view matrix 看向的方向
+    uniform mat4 uPMatrix_Phong;    // projection matrix 攝影機的位置
+
+    varying vec3 mvNormal; // N 裡面的東西
+    varying vec3 mvVertex;
+    varying vec3 v_aFrontColor_Phong;
+
+    void main(void){
+        mvVertex = (uMVMatrix_Phong * vec4(aVertexPosition_Phong, 1.0)).xyz;
+        mat3 normalMatrix = mat3(uMVMatrix_Phong);
+    	mvNormal = normalMatrix * aVertexNormal_Phong;
+        gl_Position = uPMatrix_Phong *  uMVMatrix_Phong * vec4(aVertexPosition_Phong, 1.0);
+        v_aFrontColor_Phong = aFrontColor_Phong;
+    }
+</script>
+
+<script id="fragmentShader_Phong" type="fragment">
+    precision mediump float;
+
+    varying vec3 mvNormal; // N 裡面的東西
+    varying vec3 mvVertex;
+    varying vec3 v_aFrontColor_Phong;
+
+    void main(void) {
+        // 打在 vertex 上的光線設定
+    	vec3 light1 = vec3(-50, 20, -25); // 光線位置
+    	vec3 lightColor1 = vec3(1.0, 0.0, 0.0);  // 光線顏色
+
+        vec3 light2 = vec3(0, 20, -25); // 光線位置
+    	vec3 lightColor2 = vec3(0.0, 1.0, 0.0);  // 光線顏色
+
+        vec3 light3 = vec3(50, 20, -25); // 光線位置
+    	vec3 lightColor3 = vec3(0.0, 0.0, 1.0);  // 光線顏色
+
+    	vec3 V = -normalize(mvVertex);
+    	vec3 N = normalize(mvNormal);
+
+    	vec3 L1 = normalize(light1 - mvVertex);
+        vec3 H1 = normalize(L1+V);
+
+        vec3 L2 = normalize(light2 - mvVertex);
+        vec3 H2 = normalize(L2+V);
+
+        vec3 L3 = normalize(light3 - mvVertex);
+    	vec3 H3 = normalize(L3+V);
+
+
+    	float ka = 0.2;
+    	float kd = 0.2;
+    	float ks = 0.6;
+
+    	vec3 ambient = lightColor1 * ka * v_aFrontColor_Phong + lightColor2 * ka * v_aFrontColor_Phong + lightColor3 * ka * v_aFrontColor_Phong;
+    	
+        float cos1 = max(dot(L1,N), 0.0);
+        float cos2 = max(dot(L2,N), 0.0);
+        float cos3 = max(dot(L3,N), 0.0);
+
+    	vec3 diffuse = lightColor1 * kd * v_aFrontColor_Phong * cos1 + lightColor2 * kd * v_aFrontColor_Phong * cos2 + lightColor3 * kd * v_aFrontColor_Phong * cos3;
+    	
+        float cosAlpha1 = max(dot(H1,N), 0.0);
+        float cosAlpha2 = max(dot(H2,N), 0.0);
+        float cosAlpha3 = max(dot(H3,N), 0.0);
+
+    	vec3 specular = lightColor1 * ks * pow(cosAlpha1, 16.0) + lightColor2 * ks * pow(cosAlpha2, 16.0) + lightColor3 * ks * pow(cosAlpha3, 16.0);
+
+    	vec3 gouraud = vec3(0.0, 0.0, 0.0);
+
+    	gouraud = ambient + diffuse + specular;
+
+        gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+    }
+</script>
+
+
+<script type="text/javascript">
+    // *************************** gl variable ***************************
+    var gl;
+
+
+    // *************************** Flat variable ***************************
+    var shaderProgram_Flat;
+
+    var mvMatrix_Flat = mat4.create();
+    var pMatrix_Flat  = mat4.create();
+    var shear_Flat  = mat4.create();
+    mat4.identity(shear_Flat);
+    shear_Flat[4] = 1;
+    
+                                        
+
+    var teapotVertexPositionBuffer_Flat;
+    var teapotVertexNormalBuffer_Flat;
+    var teapotVertexFrontColorBuffer_Flat;
+
+    var teapotAngle_Flat = 180;
+    var lastTime_Flat    = 0;
+    
+    
+    // *************************** Gouraud variable ***************************
+    var shaderProgram_Gouraud;
+
+    var mvMatrix_Gouraud = mat4.create();
+    var pMatrix_Gouraud  = mat4.create();
+
+    var teapotVertexPositionBuffer_Gouraud;
+    var teapotVertexNormalBuffer_Gouraud;
+    var teapotVertexFrontColorBuffer_Gouraud;
+
+    var teapotAngle_Gouraud = 180;
+    var lastTime_Gouraud    = 0;
+
+
+    // *************************** Phong variable ***************************
+    var shaderProgram_Phong;
+
+    var mvMatrix_Phong = mat4.create();
+    var pMatrix_Phong  = mat4.create();
+
+    var teapotVertexPositionBuffer_Phong;
+    var teapotVertexNormalBuffer_Phong;
+    var teapotVertexFrontColorBuffer_Phong;
+
+    var teapotAngle_Phong = 180;
+    var lastTime_Phong    = 0;
+
+
+
+    
+    
+    // function: initGL *****************************************************
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+            gl.viewportWidth  = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } 
+        catch (e) {
+        }
+
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+    
+    // function: getShader *****************************************************
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var shaderSource = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                shaderSource += k.textContent;
+            }
+
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } 
+        else if (shaderScript.type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } 
+        else {
+            return null;
+        }
+
+        gl.shaderSource(shader, shaderSource);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+
+    // function: initShaders *********************************************************************
+    function initShaders_Flat() {
+        gl.getExtension('OES_standard_derivatives');
+        gl.getExtension('EXT_shader_texture_lod');
+
+        var fragmentShader_Flat = getShader(gl, "fragmentShader_Flat");
+        var vertexShader_Flat   = getShader(gl, "vertexShader_Flat");
+
+        shaderProgram_Flat = gl.createProgram();
+
+        gl.attachShader(shaderProgram_Flat, vertexShader_Flat);
+        gl.attachShader(shaderProgram_Flat, fragmentShader_Flat);
+        gl.linkProgram(shaderProgram_Flat);
+
+        if (!gl.getProgramParameter(shaderProgram_Flat, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram_Flat);
+
+        shaderProgram_Flat.vertexPositionAttribute = gl.getAttribLocation(shaderProgram_Flat, "aVertexPosition_Flat");
+        gl.enableVertexAttribArray(shaderProgram_Flat.vertexPositionAttribute);
+        
+        shaderProgram_Flat.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram_Flat, "aFrontColor_Flat");
+        gl.enableVertexAttribArray(shaderProgram_Flat.vertexFrontColorAttribute);
+        
+        // 新加的，告訴程式有一個新的attribute "aVertexNormal_Flat"
+        shaderProgram_Flat.vertexNormalAttribute = gl.getAttribLocation(shaderProgram_Flat, "aVertexNormal_Flat");
+        gl.enableVertexAttribArray(shaderProgram_Flat.vertexNormalAttribute);
+
+        shaderProgram_Flat.pMatrixUniform  = gl.getUniformLocation(shaderProgram_Flat, "uPMatrix_Flat");
+        shaderProgram_Flat.mvMatrixUniform = gl.getUniformLocation(shaderProgram_Flat, "uMVMatrix_Flat");
+    }
+
+    function initShaders_Gouraud() {
+        var fragmentShader_Gouraud = getShader(gl, "fragmentShader_Gouraud");
+        var vertexShader_Gouraud   = getShader(gl, "vertexShader_Gouraud");
+
+        shaderProgram_Gouraud = gl.createProgram();
+        gl.attachShader(shaderProgram_Gouraud, vertexShader_Gouraud);
+        gl.attachShader(shaderProgram_Gouraud, fragmentShader_Gouraud);
+        gl.linkProgram(shaderProgram_Gouraud);
+
+        if (!gl.getProgramParameter(shaderProgram_Gouraud, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram_Gouraud);
+
+        shaderProgram_Gouraud.vertexPositionAttribute = gl.getAttribLocation(shaderProgram_Gouraud, "aVertexPosition_Gouraud");
+        gl.enableVertexAttribArray(shaderProgram_Gouraud.vertexPositionAttribute);
+
+        shaderProgram_Gouraud.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram_Gouraud, "aFrontColor_Gouraud");
+        gl.enableVertexAttribArray(shaderProgram_Gouraud.vertexFrontColorAttribute);
+
+        // 新加的，告訴程式有一個新的attribute "aVertexNormal_Gouraud"
+        shaderProgram_Gouraud.vertexNormalAttribute = gl.getAttribLocation(shaderProgram_Gouraud, "aVertexNormal_Gouraud");
+        gl.enableVertexAttribArray(shaderProgram_Gouraud.vertexNormalAttribute);
+
+        shaderProgram_Gouraud.pMatrixUniform  = gl.getUniformLocation(shaderProgram_Gouraud, "uPMatrix_Gouraud");
+        shaderProgram_Gouraud.mvMatrixUniform = gl.getUniformLocation(shaderProgram_Gouraud, "uMVMatrix_Gouraud");
+    }
+
+    function initShaders_Phong() {
+        var fragmentShader_Phong = getShader(gl, "fragmentShader_Phong");
+        var vertexShader_Phong   = getShader(gl, "vertexShader_Phong");
+        
+        shaderProgram_Phong = gl.createProgram();
+        gl.attachShader(shaderProgram_Phong, vertexShader_Phong);
+        gl.attachShader(shaderProgram_Phong, fragmentShader_Phong);
+        gl.linkProgram(shaderProgram_Phong);
+
+        if (!gl.getProgramParameter(shaderProgram_Phong, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+        
+        gl.useProgram(shaderProgram_Phong);
+        
+        shaderProgram_Phong.vertexPositionAttribute = gl.getAttribLocation(shaderProgram_Phong, "aVertexPosition_Phong");
+        gl.enableVertexAttribArray(shaderProgram_Phong.vertexPositionAttribute);
+
+        shaderProgram_Phong.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram_Phong, "aFrontColor_Phong");
+        gl.enableVertexAttribArray(shaderProgram_Phong.vertexFrontColorAttribute);
+
+        // 新加的，告訴程式有一個新的attribute "aVertexNormal_Phong"
+        shaderProgram_Phong.vertexNormalAttribute = gl.getAttribLocation(shaderProgram_Phong, "aVertexNormal_Phong");
+        gl.enableVertexAttribArray(shaderProgram_Phong.vertexNormalAttribute);
+
+        shaderProgram_Phong.pMatrixUniform  = gl.getUniformLocation(shaderProgram_Phong, "uPMatrix_Phong");
+        shaderProgram_Phong.mvMatrixUniform = gl.getUniformLocation(shaderProgram_Phong, "uMVMatrix_Phong");
+        
+    }
+
+
+    // function: setMatrixUniforms *********************************************
+    function setMatrixUniforms_Flat() {
+        gl.uniformMatrix4fv(shaderProgram_Flat.pMatrixUniform, false, pMatrix_Flat);
+        gl.uniformMatrix4fv(shaderProgram_Flat.mvMatrixUniform, false, mvMatrix_Flat);
+    }
+
+    function setMatrixUniforms_Gouraud() {
+        gl.uniformMatrix4fv(shaderProgram_Gouraud.pMatrixUniform, false, pMatrix_Gouraud);
+        gl.uniformMatrix4fv(shaderProgram_Gouraud.mvMatrixUniform, false, mvMatrix_Gouraud);
+    }
+
+    function setMatrixUniforms_Phong() {
+        gl.uniformMatrix4fv(shaderProgram_Phong.pMatrixUniform, false, pMatrix_Phong);
+        gl.uniformMatrix4fv(shaderProgram_Phong.mvMatrixUniform, false, mvMatrix_Phong);
+    }
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+
+
+
+    // function: handleLoadedTeapot***********************************************************************************
+    function handleLoadedTeapot_Flat(teapotData) { // 助教已經寫好的func，將teapotData放入Buffer(json->buffer)
+        teapotVertexPositionBuffer_Flat = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Flat);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
+        teapotVertexPositionBuffer_Flat.itemSize = 3;
+        teapotVertexPositionBuffer_Flat.numItems = teapotData.vertexPositions.length / 3;
+
+        teapotVertexNormalBuffer_Flat = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Flat);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
+        teapotVertexNormalBuffer_Flat.itemSize = 3;
+        teapotVertexNormalBuffer_Flat.numItems = teapotData.vertexNormals.length / 3;
+
+        teapotVertexFrontColorBuffer_Flat = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Flat);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexFrontcolors), gl.STATIC_DRAW);
+        teapotVertexFrontColorBuffer_Flat.itemSize = 3;
+        teapotVertexFrontColorBuffer_Flat.numItems = teapotData.vertexFrontcolors.length / 3;
+    }
+
+    function handleLoadedTeapot_Gouraud(teapotData) { // 助教已經寫好的func，將teapotData放入Buffer(json->buffer)
+        teapotVertexPositionBuffer_Gouraud = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Gouraud);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
+        teapotVertexPositionBuffer_Gouraud.itemSize = 3;
+        teapotVertexPositionBuffer_Gouraud.numItems = teapotData.vertexPositions.length / 3;
+
+        teapotVertexNormalBuffer_Gouraud = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Gouraud);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
+        teapotVertexNormalBuffer_Gouraud.itemSize = 3;
+        teapotVertexNormalBuffer_Gouraud.numItems = teapotData.vertexNormals.length / 3;
+
+        teapotVertexFrontColorBuffer_Gouraud = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Gouraud);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexFrontcolors), gl.STATIC_DRAW);
+        teapotVertexFrontColorBuffer_Gouraud.itemSize = 3;
+        teapotVertexFrontColorBuffer_Gouraud.numItems = teapotData.vertexFrontcolors.length / 3;
+    }
+
+    function handleLoadedTeapot_Phong(teapotData) { // 助教已經寫好的func，將teapotData放入Buffer(json->buffer)
+        teapotVertexPositionBuffer_Phong = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Phong);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
+        teapotVertexPositionBuffer_Phong.itemSize = 3;
+        teapotVertexPositionBuffer_Phong.numItems = teapotData.vertexPositions.length / 3;
+
+        teapotVertexNormalBuffer_Phong = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Phong);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
+        teapotVertexNormalBuffer_Phong.itemSize = 3;
+        teapotVertexNormalBuffer_Phong.numItems = teapotData.vertexNormals.length / 3;
+
+        teapotVertexFrontColorBuffer_Phong = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Phong);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexFrontcolors), gl.STATIC_DRAW);
+        teapotVertexFrontColorBuffer_Phong.itemSize = 3;
+        teapotVertexFrontColorBuffer_Phong.numItems = teapotData.vertexFrontcolors.length / 3;
+    }
+
+    function loadTeapot() { // 讀進模型
+        var request = new XMLHttpRequest();
+        request.open("GET", "./model/Teapot.json");
+        request.onreadystatechange = function () {
+            if (request.readyState == 4) {
+                var temp = JSON.parse(request.responseText);
+                handleLoadedTeapot_Flat(temp);
+                handleLoadedTeapot_Gouraud(temp); // 將 Json 讀進，該程式助教已完成
+                handleLoadedTeapot_Phong(temp); // 將 Json 讀進，該程式助教已完成
+            }
+        }
+        request.send();
+    }
+
+
+
+    // function: drawScene***********************************************************************************
+    function drawScene_Flat() {
+        if (teapotVertexPositionBuffer_Flat   == null || 
+            teapotVertexNormalBuffer_Flat     == null || 
+            teapotVertexFrontColorBuffer_Flat == null) {
+            
+            return;
+        }
+
+        gl.useProgram(shaderProgram_Flat);
+        // Setup Projection Matrix
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix_Flat);
+
+        // Setup Model-View Matrix 1
+        mat4.identity(mvMatrix_Flat);
+        //mat4.add(mvMatrix_Flat, mvMatrix_Flat, shear_Flat);
+        
+        mat4.translate(mvMatrix_Flat, [-30, 0, -60]);
+        mat4.rotate(mvMatrix_Flat, degToRad(teapotAngle_Flat), [0, 1, 0]);
+        mat4.scale(mvMatrix_Flat,[1, 2, 1]);
+        mat4.multiply(mvMatrix_Flat, shear_Flat, mvMatrix_Flat);
+        
+        // mvMatrix_Flat[4] = 1;
+        setMatrixUniforms_Flat();
+
+        // Setup teapot position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Flat); // 把teapotVertexPositionBuffer傳到attribute
+        gl.vertexAttribPointer(shaderProgram_Flat.vertexPositionAttribute, 
+                               teapotVertexPositionBuffer_Flat.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot front color data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Flat);
+        gl.vertexAttribPointer(shaderProgram_Flat.vertexFrontColorAttribute, 
+                               teapotVertexFrontColorBuffer_Flat.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot Vertex Normal data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Flat);
+        gl.vertexAttribPointer(shaderProgram_Flat.vertexNormalAttribute, 
+                               teapotVertexNormalBuffer_Flat.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer_Flat.numItems); 
+        
+        
+        /*
+        // Setup Model-View Matrix 2
+        mat4.identity(mvMatrix_Flat);
+        mat4.translate(mvMatrix_Flat, [-10, 0, -40]);
+        mat4.rotate(mvMatrix_Flat, degToRad(teapotAngle_Flat), [0, 1, 0]);
+        mat4.scale(mvMatrix_Flat,[1, 1, 1]);
+
+        setMatrixUniforms_Flat();
+
+        
+        // Setup teapot position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Flat); // 把傳到attribute
+        gl.vertexAttribPointer(shaderProgram_Flat.vertexPositionAttribute, 
+                               teapotVertexPositionBuffer_Flat.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot front color data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Flat);
+        gl.vertexAttribPointer(shaderProgram_Flat.vertexFrontColorAttribute, 
+                               teapotVertexFrontColorBuffer_Flat.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot Vertex Normal data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Flat);
+        gl.vertexAttribPointer(shaderProgram_Flat.vertexNormalAttribute, 
+                               teapotVertexNormalBuffer_Flat.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+        
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer_Flat.numItems);
+        */
+        
+    }
+
+
+    function drawScene_Gouraud() {
+        if (teapotVertexPositionBuffer_Gouraud   == null || 
+            teapotVertexNormalBuffer_Gouraud     == null || 
+            teapotVertexFrontColorBuffer_Gouraud == null) {
+            
+            return;
+        }
+
+        gl.useProgram(shaderProgram_Gouraud);
+        // Setup Projection Matrix
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix_Gouraud);
+
+        // Setup Model-View Matrix 1
+        mat4.identity(mvMatrix_Gouraud);
+        mat4.translate(mvMatrix_Gouraud, [0, 0, -60]);
+        mat4.rotate(mvMatrix_Gouraud, degToRad(teapotAngle_Gouraud), [0, 1, 0]);
+        mat4.scale(mvMatrix_Gouraud,[1, 1, 1]);
+
+        setMatrixUniforms_Gouraud();
+
+        // Setup teapot position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Gouraud); // 把teapotVertexPositionBuffer傳到attribute
+        gl.vertexAttribPointer(shaderProgram_Gouraud.vertexPositionAttribute, 
+                               teapotVertexPositionBuffer_Gouraud.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot front color data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Gouraud);
+        gl.vertexAttribPointer(shaderProgram_Gouraud.vertexFrontColorAttribute, 
+                               teapotVertexFrontColorBuffer_Gouraud.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot Vertex Normal data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Gouraud);
+        gl.vertexAttribPointer(shaderProgram_Gouraud.vertexNormalAttribute, 
+                               teapotVertexNormalBuffer_Gouraud.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer_Gouraud.numItems); 
+        
+        
+        /*
+        // Setup Model-View Matrix 2
+        mat4.identity(mvMatrix_Gouraud);
+        mat4.translate(mvMatrix_Gouraud, [-10, 0, -40]);
+        mat4.rotate(mvMatrix_Gouraud, degToRad(teapotAngle_Gouraud), [0, 1, 0]);
+        mat4.scale(mvMatrix_Gouraud,[1, 1, 1]);
+
+        setMatrixUniforms_Gouraud();
+
+        
+        // Setup teapot position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Gouraud); // 把傳到attribute
+        gl.vertexAttribPointer(shaderProgram_Gouraud.vertexPositionAttribute, 
+                               teapotVertexPositionBuffer_Gouraud.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot front color data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Gouraud);
+        gl.vertexAttribPointer(shaderProgram_Gouraud.vertexFrontColorAttribute, 
+                               teapotVertexFrontColorBuffer_Gouraud.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot Vertex Normal data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Gouraud);
+        gl.vertexAttribPointer(shaderProgram_Gouraud.vertexNormalAttribute, 
+                               teapotVertexNormalBuffer_Gouraud.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+        
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer_Gouraud.numItems);
+        */
+        
+    }
+
+    function drawScene_Phong() {       
+        if (teapotVertexPositionBuffer_Phong   == null || 
+            teapotVertexNormalBuffer_Phong     == null || 
+            teapotVertexFrontColorBuffer_Phong == null) {
+            
+            return;
+        }
+        gl.useProgram(shaderProgram_Phong);
+        // Setup Projection Matrix
+        mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix_Phong);
+
+        // Setup Model-View Matrix 1
+        mat4.identity(mvMatrix_Phong);
+        mat4.translate(mvMatrix_Phong, [30, 0, -60]);
+        mat4.rotate(mvMatrix_Phong, degToRad(teapotAngle_Phong), [0, 1, 1]);
+        // mat4.translate(mvMatrix_Phong, [1, 0, -50]);
+        mat4.scale(mvMatrix_Phong,[1, 1, 1]);
+
+        setMatrixUniforms_Phong();
+
+        // Setup teapot position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer_Phong); // 把teapotVertexPositionBuffer傳到attribute
+        gl.vertexAttribPointer(shaderProgram_Phong.vertexPositionAttribute, 
+                               teapotVertexPositionBuffer_Phong.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot front color data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer_Phong);
+        gl.vertexAttribPointer(shaderProgram_Phong.vertexFrontColorAttribute, 
+                               teapotVertexFrontColorBuffer_Phong.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        // Setup teapot Vertex Normal data
+        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer_Phong);
+        gl.vertexAttribPointer(shaderProgram_Phong.vertexNormalAttribute, 
+                               teapotVertexNormalBuffer_Phong.itemSize, 
+                               gl.FLOAT, 
+                               false, 
+                               0, 
+                               0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer_Phong.numItems); 
+    }
+
+    var speed_Flat = 0.06;
+    var speed_Gouraud = 0.06;
+    var speed_Phong = 0.06;
+
+    function showCoords(event) {
+        var x = event.clientX;
+        var y = event.clientY;
+        
+        speed_Gouraud = (x - 640) * 0.0005;
+    }
+
+    
+
+    // rotation speed
+    function animate_Flat() {
+        var timeNow = new Date().getTime();
+        if (lastTime_Flat != 0) {
+            var elapsed = timeNow - lastTime_Flat;
+            teapotAngle_Flat += speed_Flat * elapsed;
+        }
+        
+        lastTime_Flat = timeNow;
+    }
+
+    function animate_Gouraud() {
+        var timeNow = new Date().getTime();
+        if (lastTime_Gouraud != 0) {
+            var elapsed = timeNow - lastTime_Gouraud;
+            teapotAngle_Gouraud += speed_Gouraud * elapsed;
+        }
+        
+        lastTime_Gouraud = timeNow;
+    }
+
+    function animate_Phong() {
+        var timeNow = new Date().getTime();
+        if (lastTime_Phong != 0) {
+            var elapsed = timeNow - lastTime_Phong;
+            teapotAngle_Phong += speed_Phong * elapsed;
+        }
+        
+        lastTime_Phong = timeNow;
+    }
+
+    function tick() {
+
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        
+        drawScene_Flat();
+        animate_Flat();
+        
+        drawScene_Gouraud();
+        animate_Gouraud();
+
+        drawScene_Phong();
+        animate_Phong();
+
+        requestAnimFrame(tick);
+        
+    }
+
+    function webGLStart() {
+        var canvas = document.getElementById("ICG-canvas");
+        initGL(canvas);
+        initShaders_Flat();
+        initShaders_Gouraud();
+        initShaders_Phong();
+        loadTeapot();
+
+        gl.clearColor(0.0, 0.2, 0.2, 1.0);
+        gl.enable(gl.DEPTH_TEST);     
+
+        tick();
+    }
+</script>
+</head>
+
+<body onload="webGLStart();">
+    <canvas id="ICG-canvas" style="border: none;" width="1280" height="720" onclick="showCoords(event)"></canvas>
+    <br/>
+</body>
+
+</html>
