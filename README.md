@@ -1,4 +1,4 @@
-# InteractiveComputerGraphics
+# Interactive Computer Graphics
 
 This is the homework about the course of the Interactive Computer Graphics in National Taiwan University.
 
