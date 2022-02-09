@@ -1,4 +1,4 @@
-# Applied-Deep-Learning-HW
+# InteractiveComputerGraphics
 
 This is the homework about the course of the Interactive Computer Graphics in National Taiwan University.
 
